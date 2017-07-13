@@ -1,0 +1,27 @@
+{
+  "name": "d3-stack-time",
+  "version": "1.0.0",
+  "description": "d3 stack time",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hankaibo/d3-stack-time.git"
+  },
+  "keywords": [
+    "d3",
+    "time"
+  ],
+  "author": "hankaibo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hankaibo/d3-stack-time/issues"
+  },
+  "homepage": "https://github.com/hankaibo/d3-stack-time#readme",
+  "dependencies": {
+    "d3": "^4.9.1",
+    "d3-tip": "^0.7.1"
+  }
+}
