@@ -8,7 +8,7 @@ exports = module.exports = function () {
   // Public variables with default settings
   var backgroundColor = '#f1f1f1';
   var padding = {
-    top: 20,
+    top: 40,
     rigth: 100,
     bottom: 30,
     left: 80
@@ -18,6 +18,14 @@ exports = module.exports = function () {
   var stackColor = ['hsla(0,0%,0%,.1)', '#99ff33', '#33ff33', 'hsla(0,0%,0%,.1)', '#33ff33', '#ff3333', 'hsla(0,0%,0%,.1)'];
   var stackPadding = 0.3;
   var stackAlign = 0.1;
+
+  var titleText = '';
+  var titleTextX = 9;
+  var titleTextDY = '0.35em';
+  var titleTranslateX = 0;
+  var titleTranslateY = 0;
+  var titleColor = '#000';
+  var titleFontSize = '18';
 
   var xAxisNum = 24;
 
@@ -142,6 +150,18 @@ exports = module.exports = function () {
         .attr('width', x.bandwidth())
         .on('mouseenter.tip', tip.show)
         .on('mouseleave.tip', tip.hide);
+      // 画标题
+      var title = chart.append('g')
+        .attr('class', 'title')
+        .attr('transform', function (d) {
+          return 'translate(' + (width / 2 + titleTranslateX) + ',' + (-padding.top / 2 + titleTranslateY) + ')';
+        });
+      title.append('text')
+        .attr('x', titleTextX)
+        .attr('dy', titleTextDY)
+        .attr('fill', titleColor)
+        .attr('fontSize', titleFontSize)
+        .text(titleText);
       // 画图例
       var legend = serie.append('g')
         .attr('class', 'legend')
@@ -359,6 +379,55 @@ exports = module.exports = function () {
       return stackAlign;
     }
     stackAlign = _;
+    return chart;
+  };
+  chart.titleText = function (_) {
+    if (!arguments.length) {
+      return titleText;
+    }
+    titleText = _;
+    return chart;
+  };
+  chart.titleTextX = function (_) {
+    if (!arguments.length) {
+      return titleTextX;
+    }
+    titleTextX = _;
+    return chart;
+  };
+  chart.titleTextDY = function (_) {
+    if (!arguments.length) {
+      return titleTextDY;
+    }
+    titleTextDY = _;
+    return chart;
+  };
+  chart.titleTranslateX = function (_) {
+    if (!arguments.length) {
+      return titleTranslateX;
+    }
+    titleTranslateX = _;
+    return chart;
+  };
+  chart.titleTranslateY = function (_) {
+    if (!arguments.length) {
+      return titleTranslateY;
+    }
+    titleTranslateY = _;
+    return chart;
+  };
+  chart.titleColor = function (_) {
+    if (!arguments.length) {
+      return titleColor;
+    }
+    titleColor = _;
+    return chart;
+  };
+  chart.titleFontSize = function (_) {
+    if (!arguments.length) {
+      return titleFontSize;
+    }
+    titleFontSize = _;
     return chart;
   };
   chart.xAxisNum = function (_) {
