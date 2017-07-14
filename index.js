@@ -1,3 +1,4 @@
+//
 var d3 = require('d3');
 var tip = require('d3-tip');
 d3.tip = tip;
@@ -186,21 +187,20 @@ exports = module.exports = function () {
         var isWeekend = (day == 6 || day == 0) ? true : false;
 
         // 0条就制造两条不能呈现图的数据；
-        var len = data.values[i].length;
-        if (len == 0) {
-          data.values[i].push('24:00');
-          data.values[i].push('00:00');
-          len = 2;
+        var arr = [];
+        var temp = data.values[i].trim();
+        if (temp === '') {
+          arr.push('24:00');
+          arr.push('00:00');
+        } else if (temp.split(' ').length == 1) {
+          arr = temp.split(' ');
+          arr.push(arr[0]);
+        } else if (temp.split(' ').length > 1) {
+          arr = temp.split(' ');
         }
-        // 1条就补一条相同的数据；
-        if (len == 1) {
-          data.values[i].push(data.values[i][0]);
-          len = 2;
-        }
-        // 2条及以上什么都不做；
 
-        var arr1 = data.values[i][0].split(':');
-        var arr2 = data.values[i][len - 1].split(':');
+        var arr1 = arr[0].split(':');
+        var arr2 = arr[arr.length - 1].split(':');
         var t1 = parseInt(arr1[0]) * 60 + parseInt(arr1[1]);
         var t2 = parseInt(arr2[0]) * 60 + parseInt(arr2[1]);
 
