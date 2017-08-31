@@ -411,7 +411,6 @@ exports = module.exports = function () {
           o[STACK_LABEL[9]] = PMEarly;
           o[STACK_LABEL[10]] = PMOver;
           o[STACK_LABEL[11]] = PMAfter;
-          console.log((AMBefore + AMOver + AMRest + AMLate + AMWork + AMEarly) == (PMAfter + PMOver + PMRest + PMLate + PMWork + PMEarly));
           result.push(o);
         } else {
           o[STACK_LABEL[0]] = HALF_MINUTE;
