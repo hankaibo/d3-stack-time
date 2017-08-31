@@ -1,10 +1,9 @@
-//
 var d3 = require('d3');
 var tip = require('d3-tip');
 d3.tip = tip;
+var legend = require('d3-svg-legend');
 exports = module.exports = function () {
   'use strict';
-
   // Public variables with default settings
   var backgroundColor = '#f1f1f1';
   var padding = {
@@ -13,53 +12,67 @@ exports = module.exports = function () {
     bottom: 30,
     left: 80
   };
-
-  var data; // 数据
-  var stackColor = ['hsla(0,0%,0%,.1)', '#99ff33', '#33ff33', 'hsla(0,0%,0%,.1)', '#33ff33', '#ff3333', 'hsla(0,0%,0%,.1)'];
+  var data;
+  var stackColor = [
+    'hsla(0,0%,0%,.1)',
+    '#33ff33',
+    'hsla(0,0%,0%,.1)',
+    'red',
+    '#33ff33',
+    'yellow',
+    'hsla(0,0%,0%,.1)',
+    'red',
+    '#33ff33',
+    'yellow',
+    '#33ff33',
+    'hsla(0,0%,0%,.1)'
+  ];
   var stackPadding = 0.3;
   var stackAlign = 0.1;
-
-  var titleText = '';
+  var threshold = 6 * 60;
+  var titleText = 'title';
   var titleTextX = 9;
   var titleTextDY = '0.35em';
   var titleTranslateX = 0;
   var titleTranslateY = 0;
   var titleColor = '#000';
   var titleFontSize = '18';
-
   var xAxisNum = 24;
-
   var legendLineX1 = -6;
   var legendLineX2 = 6;
   var legendLineStroke = '#000';
   var legendTextX = 9;
   var legendTextDY = '0.35em';
   var legendTextColor = '#000';
-
   var lineColor = 'red';
   var lineWidth = 1;
-
   var stackLabelCustom = {};
   var defaultYear = new Date().getFullYear();
-
   var workMinute = 8 * 60; // 8工作时间
-  var elasticStart = 8 * 60 + 30; // 弹性上班最早开始时间
-  var elasticEnd = 9 * 60 + 30; // 弹性上班最晚开始时间
+  var elasticFirst = 8 * 60 + 30; // 弹性上班最早开始时间
+  var elasticLatest = 9 * 60 + 30; // 弹性上班最晚开始时间
   var restMinute = 1.5 * 60; //午休时间
   // Private variables
   var ALL_MINUTE = 24 * 60; // 全天时间
   var HALF_MINUTE = 12 * 60; // 半天时间
   var AFTERNOON_START = HALF_MINUTE + restMinute; // 下午上班时间
-  var AFTERNOON_END = workMinute + elasticStart + restMinute; // 下午下班最早时间
-  var STACK_LABEL = ['workBefore', 'workPre', 'workingAM', 'lunchTime', 'workingPM', 'workOver', 'workAfter'];
+  var AFTERNOON_FIRST = workMinute + elasticFirst + restMinute; // 下午下班最早时间
+  var AFTERNOON_LATEST = workMinute + elasticLatest + restMinute; // 下午下班最晚时间
+  var STACK_LABEL = ['AMBefore', 'AMOver', 'AMRest', 'AMLate', 'AMWork', 'AMEarly', 'PMRest', 'PMLate', 'PMWork', 'PMEarly', 'PMOver', 'PMAfter'];
   var STACK_LABEL_ZH = {
-    'workBefore': 'Are you OK?',
-    'workPre': '工作预备时间',
-    'workingAM': '上午工作时间',
-    'lunchTime': '午休时间',
-    'workingPM': '下午工作时间',
-    'workOver': '加班时间',
-    'workAfter': '下班'
+    'AMBefore': '休息时间',
+    'AMOver': '加班时间',
+    'AMRest': '上午休息时间',
+    'AMLate': '上午迟到时间',
+    'AMWork': '上午工作时间',
+    'AMEarly': '上午早退时间',
+
+    'PMRest': '午休时间',
+    'PMLate': '下午迟到时间',
+    'PMWork': '下午工作时间',
+    'PMEarly': '下午早退时间',
+    'PMOver': '加班时间',
+    'PMAfter': '休息时间'
   };
 
   function chart(selection) {
@@ -70,7 +83,10 @@ exports = module.exports = function () {
       var height = +svg.attr('height') - padding.top - padding.bottom;
       var chart = svg.append('g')
         .attr('fill', backgroundColor)
-        .attr('transform', 'translate(' + padding.left + ',' + padding.top + ')');
+        .attr('transform', 'translate(' + padding.left + ',' + padding.top + ')')
+        .attr('viewbox', function () {
+          return (padding.left + ' ' + padding.top + ' ' + width + ' ' + height);
+        });
       // x比例尺
       var x = d3.scaleBand()
         .rangeRound([0, width])
@@ -85,6 +101,7 @@ exports = module.exports = function () {
       // 堆积图颜色
       var z = d3.scaleOrdinal()
         .domain(STACK_LABEL)
+        // .range(d3.schemeCategory20);
         .range(stackColor);
       // 堆积图定义
       var stack = d3.stack()
@@ -94,26 +111,56 @@ exports = module.exports = function () {
         .attr('class', 'd3-tip')
         .html(function (d) {
           var isWeekend = d.data['isWeekend'];
-          var t0 = d.data[STACK_LABEL[0]];
-          var t1 = d.data[STACK_LABEL[1]];
-          var t2 = d.data[STACK_LABEL[2]];
-          var t3 = d.data[STACK_LABEL[3]];
-          var t4 = d.data[STACK_LABEL[4]];
-          var t5 = d.data[STACK_LABEL[5]];
-          if (isWeekend && (t2 + t4) <= 0) {
+          var t1 = d.data[STACK_LABEL[0]]; // 休息时间
+          var t2 = d.data[STACK_LABEL[1]]; // 上午加班时间
+          var t3 = d.data[STACK_LABEL[2]]; // 上午休息时间
+          var t4 = d.data[STACK_LABEL[3]]; // 上午迟到时间
+          var t5 = d.data[STACK_LABEL[4]]; // 上午工作时间
+          var t6 = d.data[STACK_LABEL[5]]; // 上午早退时间
+
+          var t7 = d.data[STACK_LABEL[6]]; // 下午休息时间
+          var t8 = d.data[STACK_LABEL[7]]; // 下午迟到时间
+          var t9 = d.data[STACK_LABEL[8]]; // 下午工作时间
+          var t10 = d.data[STACK_LABEL[9]]; // 下午早退时间
+          var t11 = d.data[STACK_LABEL[10]]; // 下午加班时间
+          var t12 = d.data[STACK_LABEL[11]]; // 休息时间
+          if (isWeekend && (t2 + t5 + t9 + t11) <= 0) {
             return '<h3>' + d.data.xAxis + '<h3><p>周末休息</p>';
           }
-          if (!isWeekend && (t2 + t4) <= 0) {
+          if (!isWeekend && (t2 + t5 + t9 + t11) <= 0) {
             return '<h3>' + d.data.xAxis + '<h3><p>今日未打卡</p>';
           }
+          var startTime = 0;
+          var endTime = 0;
+          var amOverTime = 0;
+          var pmOverTime = 0;
 
+          // 上午之间打卡
+          if (t2 + t5 > 0) {
+            startTime = HALF_MINUTE - t5 - t6;
+          } else {
+            startTime = HALF_MINUTE + t7 + t8;
+          }
+          endTime = HALF_MINUTE - t6 + t7 + t8 + t9;
+          amOverTime = t1;
+          pmOverTime = HALF_MINUTE + t7 + t9 + t11;
+
+          var amOverTimeStr = t2 > 0 ? (convert(amOverTime) + '--' + convert(startTime)) : 'none';
+          var pmOverTimeStr = t11 > 0 ? (convert(endTime) + '--' + convert(pmOverTime)) : 'none';
           var str = '<h3>' + d.data.xAxis + '<h3>' +
             '<p><span>工作时间:</span>' +
-            formatTime(t2 + t4) +
-            '<small>(' + convert(t0 + t1) + '--' + convert(t0 + t1 + t2 + t3 + t4) + ')</small></p>' +
-            '<p><span>加班时间:</span>' +
-            formatTime(t5) +
-            '<small>(' + convert(t0 + t1 + t2 + t3 + t4) + '--' + convert(t0 + t1 + t2 + t3 + t4 + t5) + ')</small></p>';
+            formatTime(t5 + t9) +
+            '<small>(' + convert(startTime) + '--' + convert(endTime) + ')</small></p>';;
+          if (t2) {
+            str += '<p><span>上午加班时间:</span>' +
+              formatTime(t2) +
+              '<small>(' + amOverTimeStr + ')</small></p>'
+          }
+          if (t11) {
+            str += '<p><span>下午加班时间:</span>' +
+              formatTime(t11) +
+              '<small>(' + pmOverTimeStr + ')</small></p>'
+          }
           return str;
         });
       svg.call(tip);
@@ -163,23 +210,36 @@ exports = module.exports = function () {
         .attr('fontSize', titleFontSize)
         .text(titleText);
       // 画图例
-      var legend = serie.append('g')
-        .attr('class', 'legend')
-        .attr('transform', function (d) {
-          var d = d[d.length - 1];
-          return 'translate(' + (x(d.data.xAxis) + x.bandwidth()) + ',' + ((y(d[0]) + y(d[1])) / 2) + ')';
-        });
-      legend.append('line')
-        .attr('x1', legendLineX1)
-        .attr('x2', legendLineX2)
-        .attr('stroke', legendLineStroke);
-      legend.append('text')
-        .attr('x', legendTextX)
-        .attr('dy', legendTextDY)
-        .attr('fill', legendTextColor)
-        .text(function (d) {
-          return stackLabelCustom[d.key] ? stackLabelCustom[d.key] : STACK_LABEL_ZH[d.key];
-        });
+      // var legend = serie.append('g')
+      //   .attr('class', 'legend')
+      //   .attr('transform', function (d) {
+      //     var d = d[d.length - 1];
+      //     return 'translate(' + (x(d.data.xAxis) + x.bandwidth()) + ',' + ((y(d[0]) + y(d[1])) / 2) + ')';
+      //   });
+      // legend.append('line')
+      //   .attr('x1', legendLineX1)
+      //   .attr('x2', legendLineX2)
+      //   .attr('stroke', legendLineStroke);
+      // legend.append('text')
+      //   .attr('x', legendTextX)
+      //   .attr('dy', legendTextDY)
+      //   .attr('fill', legendTextColor)
+      //   .text(function (d) {
+      //     return stackLabelCustom[d.key] ? stackLabelCustom[d.key] : STACK_LABEL_ZH[d.key];
+      //   });
+      var ordinal = d3.scaleOrdinal()
+        .domain(['迟到', '工作', '早退', '休息'])
+        .range([stackColor[3], stackColor[4], stackColor[5]], stackColor[0]);
+      chart.append('g')
+        .attr('class', 'legendOrdinal')
+        .attr('transform', 'translate(0,-40)');
+      var legendOrdinal = legend.legendColor()
+        .shapeWidth(60)
+        .orient('horizontal')
+        .scale(ordinal);
+      chart.select('.legendOrdinal')
+        .call(legendOrdinal);
+
       // 画坐标轴
       chart.append('g')
         .attr('class', 'axis axis--x')
@@ -189,8 +249,8 @@ exports = module.exports = function () {
         .attr('class', 'axis axis--y')
         .call(d3.axisLeft(yTime).ticks(xAxisNum));
       // 画线
-      drawLine(chart, y(elasticEnd / ALL_MINUTE), width);
-      drawLine(chart, y(AFTERNOON_END / ALL_MINUTE), width);
+      drawLine(chart, y(elasticLatest / ALL_MINUTE), width);
+      drawLine(chart, y(AFTERNOON_FIRST / ALL_MINUTE), width);
 
     });
 
@@ -205,87 +265,169 @@ exports = module.exports = function () {
       for (var i = 0; i < data.values.length; i++) {
         var day = new Date(defaultYear + '-' + data.axisX[i]).getDay();
         var isWeekend = (day == 6 || day == 0) ? true : false;
-
-        // 0条就制造两条不能呈现图的数据；
-        var arr = [];
-        var temp = data.values[i].trim();
-        if (temp === '') {
-          arr.push('24:00');
-          arr.push('00:00');
-        } else if (temp.split(' ').length == 1) {
-          arr = temp.split(' ');
-          arr.push(arr[0]);
-        } else if (temp.split(' ').length > 1) {
-          arr = temp.split(' ');
-        }
-
-        var arr1 = arr[0].split(':');
-        var arr2 = arr[arr.length - 1].split(':');
-        var t1 = parseInt(arr1[0]) * 60 + parseInt(arr1[1]);
-        var t2 = parseInt(arr2[0]) * 60 + parseInt(arr2[1]);
-
+        // object
         var o = {
           xAxis: data.axisX[i],
           isWeekend: isWeekend,
           all: ALL_MINUTE
         };
 
-        var s0;
-        var s1;
-        var s2;
-        var s3;
-        var s4;
-        var s5;
-        var s6;
+        var len = data.values[i].length;
+        if (len >= 2) {
+          var arr1 = data.values[i][0].split(':');
+          var arr2 = data.values[i][len - 1].split(':');
+          var t1 = parseInt(arr1[0]) * 60 + parseInt(arr1[1]); // 上班打卡时间
+          var t2 = parseInt(arr2[0]) * 60 + parseInt(arr2[1]); // 下班打卡时间
 
-        // s0
-        if (t1 >= 0) {
-          s0 = t1;
-        }
-        // s1
-        if (t1 < elasticStart) {
-          s1 = (t2 > elasticStart ? elasticStart : t2) - t1;
+          var AMBefore = 0; // 休息时间
+          var AMOver = 0; // 预备时间,(超过阈值当作加班时间)
+          var AMRest = 0; // 上午休息时间
+          var AMLate = 0; // 上午迟到时间
+          var AMWork = 0; // 上午工作时间
+          var AMEarly = 0; // 上午早退时间
+
+          var PMRest = 0; // 午休时间
+          var PMLate = 0; // 下午迟到时间
+          var PMWork = 0; // 下午工作时间
+          var PMEarly = 0; // 下午早退时间
+          var PMOver = 0; // 加班时间，非正常情况下特殊加班用
+          var PMAfter = 0; // 休息时间
+
+          if (t2 <= elasticFirst) {
+            AMBefore = t1;
+            AMOver = t2 - t1;
+            AMRest = HALF_MINUTE - t2;
+            AMLate = 0;
+            AMWork = 0;
+            AMEarly = 0;
+
+            PMRest = 0;
+            PMLate = 0;
+            PMWork = 0;
+            PMEarly = 0;
+            PMOver = 0;
+            PMAfter = HALF_MINUTE;
+          } else if (t2 <= HALF_MINUTE) {
+            AMBefore = t1;
+            if (t1 < elasticFirst) {
+              AMOver = elasticFirst - t1;
+            } else {
+              AMOver = 0;
+            }
+            AMRest = 0;
+            if (t1 > elasticLatest) {
+              AMLate = t1 - elasticLatest;
+            } else {
+              AMLate = 0;
+            }
+            if (t1 <= elasticFirst) {
+              AMWork = t2 - elasticFirst;
+            } else if (t1 > elasticFirst) {
+              AMWork = t2 - t1;
+            } else {
+              AMWork = 0;
+            }
+            AMEarly = HALF_MINUTE - t2;
+
+            PMRest = 0;
+            PMLate = 0;
+            PMWork = 0
+            PMEarly = 0;
+            PMOver = 0;
+            PMAfter = HALF_MINUTE;
+          } else if (t2 <= AFTERNOON_START && t1 >= HALF_MINUTE) {
+            AMBefore = HALF_MINUTE;
+            AMOver = 0;
+            AMRest = 0;
+            AMLate = 0;
+            AMWork = 0;
+            AMEarly = 0;
+            PMRest = restMinute;
+            PMLate = 0;
+            PMWork = 0;
+            PMEarly = 0;
+            PMOver = 0;
+            PMAfter = HALF_MINUTE - restMinute;
+          } else if (t1 >= HALF_MINUTE) {
+            AMBefore = HALF_MINUTE;
+            AMOver = 0;
+            AMRest = 0;
+            AMLate = 0;
+            AMWork = 0;
+            AMEarly = 0;
+            PMRest = restMinute;
+            PMLate = t1 > AFTERNOON_START ? (t1 - AFTERNOON_START) : 0;
+            PMWork = (t2 - t1 >= workMinute) ? workMinute : (t2 - (t1 < AFTERNOON_START ? AFTERNOON_START : t1));
+            PMEarly = (t2 < AFTERNOON_FIRST) ? (AFTERNOON_FIRST - t2) : 0;
+            PMOver = (PMWork < workMinute) ? 0 : (AMWork - workMinute);
+            PMAfter = ALL_MINUTE - (t2 < AFTERNOON_START ? AFTERNOON_START : t2) - PMEarly;
+          } else if (t1 >= AFTERNOON_LATEST) {
+            AMBefore = HALF_MINUTE;
+            AMOver = 0;
+            AMRest = 0;
+            AMLate = 0;
+            AMWork = 0;
+            AMEarly = 0;
+            PMRest = HALF_MINUTE - PMOver - PMAfter;
+            PMLate = 0;
+            PMWork = 0;
+            PMEarly = 0;
+            PMOver = t2 - t1;
+            PMAfter = ALL_MINUTE - t2;
+          } else {
+            AMOver = t1 > elasticFirst ? 0 : (elasticFirst - t1);
+            AMRest = 0;
+            AMLate = t1 < elasticLatest ? 0 : t1 - elasticLatest;
+            AMWork = HALF_MINUTE - (t1 >= elasticFirst ? t1 : elasticFirst);
+            AMEarly = 0;
+            AMBefore = t1 - AMLate;
+
+            PMRest = restMinute;
+            PMLate = 0;
+            if (t2 < AFTERNOON_START) {
+              PMWork = 0;
+            } else {
+              var temp = t2 - (t1 < elasticFirst ? elasticFirst : t1) - restMinute;
+              PMWork = temp > workMinute ? (workMinute - AMWork) : (temp - AMWork);
+            }
+            if (t2 < AFTERNOON_LATEST) {
+              PMEarly = workMinute - AMWork - PMWork;
+            } else {
+              PMEarly = 0;
+            }
+            PMOver = (t2 - (t1 < elasticFirst ? elasticFirst : t1) - restMinute - workMinute) > 0 ? (t2 - (t1 < elasticFirst ? elasticFirst : t1) - restMinute - workMinute) : 0;
+            PMAfter = ALL_MINUTE - (t2 < AFTERNOON_START ? AFTERNOON_START : t2) - PMEarly;
+          }
+
+          o[STACK_LABEL[0]] = AMBefore;
+          o[STACK_LABEL[1]] = AMOver;
+          o[STACK_LABEL[2]] = AMRest;
+          o[STACK_LABEL[3]] = AMLate;
+          o[STACK_LABEL[4]] = AMWork;
+          o[STACK_LABEL[5]] = AMEarly;
+          o[STACK_LABEL[6]] = PMRest;
+          o[STACK_LABEL[7]] = PMLate;
+          o[STACK_LABEL[8]] = PMWork;
+          o[STACK_LABEL[9]] = PMEarly;
+          o[STACK_LABEL[10]] = PMOver;
+          o[STACK_LABEL[11]] = PMAfter;
+          console.log((AMBefore + AMOver + AMRest + AMLate + AMWork + AMEarly) == (PMAfter + PMOver + PMRest + PMLate + PMWork + PMEarly));
+          result.push(o);
         } else {
-          s1 = 0;
+          o[STACK_LABEL[0]] = HALF_MINUTE;
+          o[STACK_LABEL[1]] = 0;
+          o[STACK_LABEL[2]] = 0;
+          o[STACK_LABEL[3]] = 0;
+          o[STACK_LABEL[4]] = 0;
+          o[STACK_LABEL[5]] = 0;
+          o[STACK_LABEL[6]] = 0;
+          o[STACK_LABEL[7]] = 0;
+          o[STACK_LABEL[8]] = 0;
+          o[STACK_LABEL[9]] = 0;
+          o[STACK_LABEL[10]] = 0;
+          o[STACK_LABEL[11]] = HALF_MINUTE;
+          result.push(o);
         }
-        // s2
-        if (t1 < HALF_MINUTE && t1 >= elasticStart) {
-          s2 = (t2 > HALF_MINUTE ? HALF_MINUTE : t2) - t1;
-        } else if (t1 < elasticStart) {
-          s2 = (t2 > HALF_MINUTE ? HALF_MINUTE : t2) - elasticStart;
-        } else {
-          s2 = 0;
-        }
-        // s3
-        if (t2 >= HALF_MINUTE) {
-          s3 = restMinute;
-        } else {
-          s3 = 0;
-        }
-        // s4
-        if (t2 < AFTERNOON_START) {
-          s4 = 0;
-        } else {
-          s4 = (t2 - AFTERNOON_START + s2 >= workMinute) ? (workMinute - s2) : (t2 - AFTERNOON_START);
-        }
-        // s5
-        if (s2 + s4 < workMinute) {
-          s5 = 0;
-        } else {
-          s5 = t2 - (t1 < elasticStart ? elasticStart : t1) - workMinute - restMinute;
-        }
-        // s6
-        if (t2 <= ALL_MINUTE) {
-          s6 = ALL_MINUTE - t2;
-        }
-        o[STACK_LABEL[0]] = s0;
-        o[STACK_LABEL[1]] = s1;
-        o[STACK_LABEL[2]] = s2;
-        o[STACK_LABEL[3]] = s3;
-        o[STACK_LABEL[4]] = s4;
-        o[STACK_LABEL[5]] = s5;
-        o[STACK_LABEL[6]] = s6;
-        result.push(o);
       }
       return result;
     }
@@ -514,18 +656,18 @@ exports = module.exports = function () {
     workMinute = _;
     return chart;
   };
-  chart.elasticStart = function (_) {
+  chart.elasticFirst = function (_) {
     if (!arguments.length) {
-      return elasticStart;
+      return elasticFirst;
     }
-    elasticStart = _;
+    elasticFirst = _;
     return chart;
   };
-  chart.elasticEnd = function (_) {
+  chart.elasticLatest = function (_) {
     if (!arguments.length) {
-      return elasticEnd;
+      return elasticLatest;
     }
-    elasticEnd = _;
+    elasticLatest = _;
     return chart;
   };
   chart.restMinute = function (_) {
