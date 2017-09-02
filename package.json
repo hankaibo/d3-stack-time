@@ -1,6 +1,6 @@
 {
   "name": "d3-stack-time",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "d3 stack time",
   "main": "index.js",
   "scripts": {
